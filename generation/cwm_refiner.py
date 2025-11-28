@@ -16,9 +16,14 @@ class CWMRefiner:
         self.max_attempts = max_attempts
         self.candidates: List[CodeCandidate] = []
 
-    def refine(self, initial_code: str) -> str:
+    def refine(self, initial_code: str, template: str = "gym_code", **template_kwargs) -> str:
         """
-        Implements the Tree Search refinement from CWM for tic-tac-toe.
+        Implements the Tree Search refinement from CWM for any game type.
+        
+        Args:
+            initial_code: The initial generated code to refine
+            template: The template to use for refinement (default: gym_code)
+            **template_kwargs: Additional arguments to pass to the template (e.g., rulebook)
         """
         root = CodeCandidate(initial_code)
         self.evaluate_candidate(root)
@@ -30,15 +35,16 @@ class CWMRefiner:
             best_candidate = self._select_candidate()
             
             if best_candidate.transition_accuracy == 1.0:
-                print(f"✅ [Refiner] Found candidate with 100% accuracy on Attempt {i}")
+                print(f"Found working code on attempt {i+1}")
                 return best_candidate.code
 
-            print(f"🔄 [Refiner] Refining candidate (Acc: {best_candidate.transition_accuracy:.2f})")
+            print(f"Refining candidate (Acc: {best_candidate.transition_accuracy:.2f})")
             
-            # Generate new tic-tac-toe code based on the error
-            new_code = self.client.generate_code(
-                template="tic_tac_toe",
-                failed_tests=best_candidate.error_trace
+            # Generate refined code based on the error using the refiner model
+            new_code = self.client.generate_refinement(
+                template=template,
+                failed_tests=best_candidate.error_trace,
+                **template_kwargs
             )
             
             new_node = CodeCandidate(new_code, parent=best_candidate)
@@ -49,7 +55,7 @@ class CWMRefiner:
 
         # Return best code found if budget exhausted
         best = max(self.candidates, key=lambda c: c.transition_accuracy)
-        print(f"⚠️ [Refiner] Budget exhausted. Returning best candidate (Acc: {best.transition_accuracy:.2f})")
+        print(f"Budget exhausted. Returning best candidate (Acc: {best.transition_accuracy:.2f})")
         return best.code
 
     def evaluate_candidate(self, candidate: CodeCandidate):
