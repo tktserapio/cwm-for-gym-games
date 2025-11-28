@@ -1,0 +1,23 @@
+Given the game description below, write a Python class `CustomEnv` that implements this game as a Gymnasium environment.
+
+Game Description:
+{{ rulebook }}
+
+Requirements:
+1. Inherit from `gymnasium.Env`.
+2. **Action Space:** Use `spaces.Discrete(N)`.
+3. **Observation Space:** Use `spaces.Box` or `spaces.Dict`.
+4. Implement methods: `reset()`, `step(action)`, `render()`, `valid_moves()`.
+   - `valid_moves()` MUST return a list of integers representing valid action indices.
+5. **Reward:** +1 for win, -1 for loss, 0 otherwise.
+6. **Self-Play:** The environment should internally switch `self.current_player` after each step.
+7. Use ONLY `numpy` and `gymnasium`.
+
+{% if failed_tests %}
+The previous implementation failed the following unit tests (CWM Refinement):
+{{ failed_tests }}
+
+Please fix the logic errors shown in the stack trace above.
+{% endif %}
+
+Return ONLY the Python code block.

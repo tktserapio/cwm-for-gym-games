@@ -1,0 +1,90 @@
+Generate a complete Kuhn Poker environment as a Python class `CustomEnv` that inherits from `gymnasium.Env`.
+
+GAME RULES:
+- Two players: Player 0 and Player 1
+- Deck: 3 cards (Jack=0, Queen=1, King=2). Rank: King > Queen > Jack
+- Pot: Each player antes 1 chip (Total Pot = 2)
+- Game phases: Deal -> Betting -> Showdown (if no fold)
+
+GAME FLOW:
+1. Chance deals one card to each player (P0 gets card first, then P1)
+2. Player 0 acts first with 'check' or 'bet'
+3. If P0 checks: P1 can 'check' or 'bet'
+   - If P1 checks: Showdown
+   - If P1 bets: P0 must 'fold' or 'call'
+4. If P0 bets: P1 must 'fold' or 'call'
+5. Showdown: Higher card wins pot (if no fold occurred)
+
+BETTING:
+- 'bet' adds 1 chip to pot
+- 'call' matches the bet (adds 1 chip)
+- 'fold' ends game, opponent wins pot
+
+TECHNICAL REQUIREMENTS:
+
+1. **Action Space**: `spaces.Discrete(4)` 
+   - 0: check, 1: bet, 2: fold, 3: call
+
+2. **Observation Space**: `spaces.Dict({
+   'player_card': spaces.Discrete(3),  # 0=Jack, 1=Queen, 2=King
+   'pot_size': spaces.Discrete(5),     # Max pot is 4 chips
+   'betting_history': spaces.MultiBinary(6)  # Max 6 betting actions
+   })`
+
+3. **State Management**:
+   - Track current player (0 or 1)
+   - Track cards dealt to each player
+   - Track pot size and betting history
+   - Track game phase (dealing, betting, showdown, ended)
+
+4. **Required Methods**:
+   ```python
+   def reset(self, seed=None, options=None):
+       # Deal cards randomly, return observation for P0
+   
+   def step(self, action):
+       # Execute action, return (observation, reward, terminated, truncated, info)
+   
+   def valid_moves(self):
+       # Return list of valid actions based on game state
+   
+   def render(self):
+       # Print current game state
+   ```
+
+5. **Game Logic**:
+   - Game starts with dealing phase (automatic)
+   - `self.current_player` alternates between 0 and 1
+   - Rewards calculated as net chip change for each player
+   - `terminated = True` when game ends (fold or showdown)
+   - `truncated = False` (no time limits)
+
+6. **Rewards**:
+   - Calculate net change in chips for each player
+   - Example: P0 bets (cost 1), P1 calls (cost 1), P0 wins pot of 4
+     - P0: invested 2 (1 ante + 1 bet), wins 4, net = +2
+     - P1: invested 2 (1 ante + 1 call), wins 0, net = -2
+
+7. CRITICAL REQUIREMENT FOR INVALID MOVES:
+If `step(action)` receives an action that is NOT in `valid_moves()`:
+- Do NOT raise an Exception
+- Do NOT crash  
+- Return `reward = -10` (heavy penalty)
+- Return `terminated = False` (game continues)
+- The state should NOT change
+
+8. **Information Hiding**:
+   - Players can only observe their own card
+   - Players can see betting history but not opponent's card
+   - Observation returned should be for current player only
+
+9. **Libraries**: Use ONLY `import gymnasium as gym`, `import numpy as np`, `from gymnasium import spaces`, `import random`
+
+{% if failed_tests %}
+DEBUGGING: The previous implementation failed with:
+{{ failed_tests }}
+
+Fix the specific errors shown above while maintaining the exact API.
+{% endif %}
+
+Generate ONLY the Python code. Start with imports and class definition.

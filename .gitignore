@@ -1,0 +1,10 @@
+config.yaml
+commands.txt
+.env
+.venv
+
+# Pycache Folders
+__pycache__/
+output/__pycache__/
+prompts/__pycache__/
+validation/__pycache__/
