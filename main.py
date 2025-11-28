@@ -37,7 +37,7 @@ def main():
     
     # CWM Refinement Loop
     # Run unit test trajectories and prompt LLM to fix errors iteratively
-    print(">>> PHASE 3: Starting CWM Refinement Loop...")
+    print("Starting CWM Refinement Loop...")
     
     # Pass the template and rulebook to the refiner for error fixing
     final_code = refiner.refine(

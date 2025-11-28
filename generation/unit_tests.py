@@ -33,10 +33,20 @@ def run_trajectory_test(code_str: str) -> bool:
 
         env = env_class()
         
-        # Test Reset
-        obs, info = env.reset()
+        # Test Reset API
+        try:
+            reset_result = env.reset()
+            if isinstance(reset_result, tuple) and len(reset_result) == 2:
+                obs, info = reset_result
+            else:
+                # Old API compatibility - try to handle single return value
+                obs = reset_result
+                info = {}
+        except Exception as e:
+            raise ValueError(f"reset() failed: {e}")
+        
         if obs is None: 
-            raise ValueError("reset() returned None")
+            raise ValueError("reset() returned None observation")
 
         # Test Random Walk
         # We simulate a 'smart' random agent that only picks valid moves
@@ -53,7 +63,20 @@ def run_trajectory_test(code_str: str) -> bool:
                 break
 
             action = np.random.choice(valid_moves)
-            obs, reward, terminated, truncated, info = env.step(action)
+            
+            try:
+                step_result = env.step(action)
+                if len(step_result) == 5:
+                    obs, reward, terminated, truncated, info = step_result
+                elif len(step_result) == 4:
+                    # Old API compatibility
+                    obs, reward, done, info = step_result
+                    terminated = done
+                    truncated = False
+                else:
+                    raise ValueError(f"step() must return 4 or 5 values, got {len(step_result)}")
+            except Exception as e:
+                raise ValueError(f"step() failed: {e}")
 
             if not isinstance(reward, (int, float)):
                  raise ValueError(f"Reward must be number, got {type(reward)}")
