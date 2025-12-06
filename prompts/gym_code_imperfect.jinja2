@@ -1,0 +1,81 @@
+Given the game description below, write a Python class `CustomEnv` that implements this IMPERFECT INFORMATION game as a Gymnasium environment.
+
+Game Description:
+{{ rulebook }}
+
+IMPORTANT: This is an IMPERFECT INFORMATION game. Players have PRIVATE/HIDDEN information.
+
+Requirements:
+1. Inherit from `gymnasium.Env`.
+
+2. **Action Space:** Use `spaces.Discrete(N)`.
+
+3. **Observation Space - CRITICAL FOR IMPERFECT INFO:**
+   - Use `spaces.Box` representing ONLY what the CURRENT PLAYER can see
+   - **HIDE opponent's private information** (cards, hidden pieces, etc.)
+   - Example for Poker: `[my_card, pot_size, opponent_last_action, chips_remaining]`
+   - **DO NOT INCLUDE**: opponent's cards, hidden information
+   - The observation MUST change perspective based on `self.current_player`
+   - CRITICAL: NO NESTED SPACES (no Dict inside Dict)
+   - Flatten to single array: `spaces.Box(low=..., high=..., shape=(n,), dtype=np.int8)`
+
+4. **Required Methods**:
+   ```python
+   def reset(self, seed=None, options=None):
+       super().reset(seed=seed)
+       # Deal cards/setup hidden info
+       # Return observation from Player 0's perspective
+       return self._get_observation(), {}
+   
+   def step(self, action):
+       # Execute action for self.current_player
+       # Check win/loss/draw
+       # Switch player if game continues
+       # Return observation from NEW current player's perspective
+       return self._get_observation(), reward, terminated, truncated, {}
+   
+   def _get_observation(self):
+       # CRITICAL: Return observation for self.current_player ONLY
+       # Hide opponent's private information
+       if self.current_player == 0:
+           return np.array([self.player0_card, self.pot, ...])
+       else:
+           return np.array([self.player1_card, self.pot, ...])
+   
+   def valid_moves(self):
+       # Return valid actions for current player
+       return [...]
+   
+   def render(self):
+       # Print visible game state (can show hidden for debugging)
+       print(...)
+   ```
+
+5. **Game Logic**:
+   - Track `self.current_player` (0 and 1, or 1 and -1)
+   - Track PRIVATE state for each player (cards, hidden pieces)
+   - Track PUBLIC state (pot, board, visible pieces)
+   - Rewards from current player's perspective:
+     - `+1` if current player wins
+     - `-1` if current player loses
+     - `0` for draw/ongoing
+   - `terminated = True` when game ends
+   - **Auto-switch players** after each move (if game continues)
+   - **Return observation from new player's perspective after switch**
+
+6. **CRITICAL - Invalid Move Handling**:
+   If `step(action)` receives an action NOT in `valid_moves()`:
+   - Return `reward = -10`
+   - Return `terminated = True`
+   - Do NOT raise exceptions
+
+7. **Libraries**: Use ONLY `import gymnasium as gym`, `import numpy as np`, `from gymnasium import spaces`, `import random`
+
+{% if failed_tests %}
+DEBUGGING: The previous implementation failed with:
+{{ failed_tests }}
+
+Fix the specific errors shown above while maintaining the exact API.
+{% endif %}
+
+Generate ONLY the Python code. Start with imports and class definition.

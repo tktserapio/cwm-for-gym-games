@@ -1,0 +1,70 @@
+Given the game description below, write a Python class `CustomEnv` that implements this PERFECT INFORMATION game as a Gymnasium environment.
+
+Game Description:
+{{ rulebook }}
+
+IMPORTANT: This is a PERFECT INFORMATION game. All players can see the entire game state.
+
+Requirements:
+1. Inherit from `gymnasium.Env`.
+
+2. **Action Space:** Use `spaces.Discrete(N)`.
+
+3. **Observation Space:** 
+   - Use `spaces.Box` representing the GLOBAL/OBJECTIVE board state
+   - Include ALL game state visible to both players
+   - Example for Chess: Full 8x8 board with all pieces
+   - Example for Tic-Tac-Toe: 3x3 grid with values [-1, 0, 1]
+   - CRITICAL: NO NESTED SPACES (no Dict inside Dict, no Tuple inside Tuple)
+   - Prefer flattening to single numpy array: `spaces.Box(low=..., high=..., shape=(n,), dtype=np.int8)`
+
+4. **Required Methods**:
+   ```python
+   def reset(self, seed=None, options=None):
+       super().reset(seed=seed)
+       # Initialize game state
+       # Return (observation, info)
+       return observation, {}
+   
+   def step(self, action):
+       # Execute action for self.current_player
+       # Check win/loss/draw
+       # Switch player if game continues
+       # Return (observation, reward, terminated, truncated, info)
+       return obs, reward, terminated, truncated, {}
+   
+   def valid_moves(self):
+       # Return list of valid action indices for current player
+       return [...]
+   
+   def render(self):
+       # Print current game state
+       print(...)
+   ```
+
+5. **Game Logic**:
+   - Track `self.current_player` (typically 1 and -1, or 0 and 1)
+   - Rewards from current player's perspective:
+     - `+1` if current player wins with this action
+     - `-1` if current player loses (rare in perfect info games)
+     - `0` for draw or ongoing game
+   - `terminated = True` when game ends
+   - `truncated = False` (unless max moves reached)
+   - **Auto-switch players**: After each valid move, switch `self.current_player` if game not over
+
+6. **CRITICAL - Invalid Move Handling**:
+   If `step(action)` receives an action NOT in `valid_moves()`:
+   - Return `reward = -10` (heavy penalty)
+   - Return `terminated = True` (end episode immediately)
+   - Do NOT raise exceptions or crash
+
+7. **Libraries**: Use ONLY `import gymnasium as gym`, `import numpy as np`, `from gymnasium import spaces`
+
+{% if failed_tests %}
+DEBUGGING: The previous implementation failed with:
+{{ failed_tests }}
+
+Fix the specific errors shown above while maintaining the exact API.
+{% endif %}
+
+Generate ONLY the Python code. Start with imports and class definition.

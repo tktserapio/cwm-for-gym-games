@@ -84,8 +84,6 @@ class OpenAIClient:
             temperature=self.code_temperature
         )
         
-        content = response.choices[0].message.content
-        
         # Python code extraction (handles ```python ... ``` and ``` ... ``` cases)
         if "```python" in content:
             content = content.split("```python")[1].split("```")[0].strip()
@@ -93,3 +91,33 @@ class OpenAIClient:
             content = content.split("```")[1].split("```")[0].strip()
             
         return content
+    
+    # def classify_game(self, rulebook):
+    #     """
+    #     Classifies a game as 'perfect' or 'imperfect' information.
+    #     Uses a classification prompt to determine game type.
+    #     """
+    #     prompt_template = self.env.get_template("game_classifier.jinja2")
+    #     prompt_text = prompt_template.render(rulebook=rulebook)
+        
+    #     print(f"Classifying game type...")
+    #     response = self.client.chat.completions.create(
+    #         model=self.refiner_model,  # Use cheaper model for classification
+    #         messages=[{"role": "user", "content": prompt_text}],
+    #         temperature=0.0  # Deterministic classification
+    #     )
+        
+    #     classification = response.choices[0].message.content.strip().lower()
+        
+    #     # Validate response
+    #     if "perfect" in classification:
+    #         game_type = "perfect"
+    #     elif "imperfect" in classification:
+    #         game_type = "imperfect"
+    #     else:
+    #         # Default to perfect if unclear
+    #         print(f"Warning: Unclear classification '{classification}', defaulting to 'perfect'")
+    #         game_type = "perfect"
+        
+    #     print(f"Game classified as: {game_type} information")
+    #     return game_type

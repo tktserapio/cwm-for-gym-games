@@ -1,0 +1,40 @@
+Rules of Kuhn Poker
+
+Setup:
+- Two players: Player 0 and Player 1.
+- Deck: 3 cards (Jack, Queen, King). Rank: K > Q > J.
+- Pot: Each player antes 1 chip (Total Pot = 2).
+
+Game Flow & Actions:
+1. The game begins with the 'Chance' player.
+2. Chance MUST execute two actions: 'deal: <card> to P0' and 'deal: <card> to P1'.
+3. These deal actions MUST be recorded in the state history.
+4. After dealing, Player 0 acts first.
+
+Betting Phase:
+- Available actions: 'check' or 'bet'.
+- If P0 checks:
+    - P1 can 'check' or 'bet'.
+    - If P1 checks: Showdown immediately.
+    - If P1 bets: P0 must 'fold' or 'call'.
+- If P0 bets:
+    - P1 must 'fold' or 'call'.
+
+Bet Amounts:
+- A 'bet' adds 1 chip to the pot.
+- A 'call' matches the bet (adds 1 chip).
+
+Showdown:
+- If neither player folded, compare private cards.
+- Higher rank wins the pot.
+- Winner takes all chips in the pot.
+
+Rewards:
+- Rewards are the net change in chips for each player.
+- Example: If P0 bets (cost 1), P1 calls (cost 1), pot is 4. P0 wins.
+    - P0 invested 2 (1 ante + 1 bet), wins 4. Net: +2.
+    - P1 invested 2, wins 0. Net: -2.
+
+Information:
+- Players can ONLY see their own card and the betting history.
+- They CANNOT see the opponent's deal action in the history (it is hidden/private).

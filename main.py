@@ -25,24 +25,48 @@ def main():
     llm = OpenAIClient(config)
     refiner = CWMRefiner(llm_client=llm, max_attempts=config['refinement']['max_attempts'])
     
-    # Use Jinja2 to load rulebook template for Kuhn Poker
-    env = Environment(loader=FileSystemLoader('prompts'))
-    template = env.get_template('kuhn_poker.jinja2')
-    rulebook = template.render()
+    # Option 1: Manual game type from config
+    game_type = config.get('game', {}).get('type', 'perfect')
+    
+    # Option 2: Load rulebook from file (if specified in config)
+    rulebook_file = config.get('game', {}).get('rulebook_file')
+    
+    if rulebook_file and os.path.exists(rulebook_file):
+        print(f"Loading rulebook from: {rulebook_file}")
+        with open(rulebook_file, 'r') as f:
+            rulebook = f.read()
+    else:
+        # Option 3: Hardcoded rulebook in code
+        rulebook = """Tic-Tac-Toe: Two players alternate placing X and O on a 3x3 grid.
+        Player 1 (X) goes first, Player -1 (O) goes second.
+        Win condition: Get 3 of your symbols in a row (horizontal, vertical, or diagonal).
+        Draw condition: Grid is full with no winner.
+        Actions: Choose position 0-8 (row-major order).
+        Game state: 3x3 grid with 0=empty, 1=X, -1=O.
+        Rewards: +1 for win, -1 for loss, 0 for draw/ongoing."""
+    
+    print(f"\n[Game Rules]:\n{rulebook}\n")
+    print(f"Game Type: {game_type} information\n")
+    
+    # Select appropriate template based on manual game type
+    if game_type == "perfect":
+        template_name = "gym_code_perfect"
+    elif game_type == "imperfect":
+        template_name = "gym_code_imperfect"
+    else:
+        raise ValueError(f"Invalid game_type: {game_type}. Must be 'perfect' or 'imperfect'")
 
-    # Initial Code Generation
-    # Uses prompts/gym_code.jinja2
+    # Initial Code Generation with appropriate template
     print("Generating Game Implementation...")
-    initial_code = llm.generate_code("gym_code", rulebook=rulebook)
+    initial_code = llm.generate_code(template_name, rulebook=rulebook)
     
     # CWM Refinement Loop
-    # Run unit test trajectories and prompt LLM to fix errors iteratively
     print("Starting CWM Refinement Loop...")
     
     # Pass the template and rulebook to the refiner for error fixing
     final_code = refiner.refine(
         initial_code=initial_code, 
-        template="gym_code", 
+        template=template_name, 
         rulebook=rulebook
     )
 
@@ -81,13 +105,13 @@ def main():
         print(f"Error: Could not import generated code.\nError: {e}")
         return
     finally:
-        # Cleanup: remove the temp file if you want
+        # Cleanup: remove the temp file
         if os.path.exists(temp_file_name):
             os.remove(temp_file_name)
 
-    # Proceed with Training
+    # Proceed with Training using appropriate wrapper for game type
     print("Training PPO agent...")
-    trainer = PPOTrainer(env_class, game_type="imperfect")
+    trainer = PPOTrainer(env_class, game_type=game_type)
     win_rate = trainer.train_and_evaluate(total_timesteps=config['rl_training']['total_timesteps'])
     
     print(f"FINAL RESULTS")

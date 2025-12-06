@@ -1,0 +1,9 @@
+Rules of Tic-Tac-Toe
+
+Setup: Tic-Tac-Toe is played on a 3x3 grid, which starts completely empty.
+Players and Marks: There are two players: Player 0 uses the 'x' mark and Player 1 uses the 'o' mark.
+Turns: Player 0 ('x') always goes first, and turns alternate between players.
+Making a Move: On your turn, you must place your mark in a single, unoccupied square. Attempting to place a mark in an already occupied square is an invalid move.
+Winning the Game: The winner is the first player to get three of their marks in a row (horizontally, vertically, or diagonally). The game ends immediately as soon as a winning line is formed.
+Drawing the Game: If all nine squares on the grid are filled and neither player has won, the game ends in a draw.
+Move Notation: Use the move notation 'mark(row,col)', where row and col are 0-indexed. For example, 'x(0,0)' means Player 0 places their mark in the top-left square.

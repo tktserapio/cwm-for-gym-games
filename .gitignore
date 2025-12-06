@@ -17,3 +17,6 @@ output/
 
 # Shell
 cwm_job.sh
+
+# Old code
+prompts/old_prompts/
