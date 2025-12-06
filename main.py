@@ -25,10 +25,20 @@ def main():
     llm = OpenAIClient(config)
     refiner = CWMRefiner(llm_client=llm, max_attempts=config['refinement']['max_attempts'])
     
-    # Generate Game Rulebook
-    print("Generating Novel Game Rules...")
-    rulebook = llm.generate_text("game_design")
-    print(f"\n[Generated Game Rules]:\n{rulebook}\n")
+    # Use hardcoded Tic-Tac-Toe rulebook for testing
+    print("Using Hardcoded Tic-Tac-Toe Rules...")
+    rulebook = """
+    Tic-Tac-Toe Gym Environment Specifications:
+    1. The game is played on a 3x3 grid (size 9 array).
+    2. Player 1 is represented by the integer 1.
+    3. Player 2 is represented by the integer -1.
+    4. Empty spaces are represented by 0.
+    5. The step() function accepts an integer action (0-8).
+    6. Rewards: +1 if the current player wins immediately, 0 for draw, 0 for ongoing.
+    7. Game Logic: The environment only manages the rules. It does NOT need to simulate an opponent (the trainer handles that).
+    8. Important: valid_moves() method must return a list of empty indices.
+    """
+    print(f"\n[Tic-Tac-Toe Rules]:\n{rulebook}\n")
 
     # Initial Code Generation
     # Uses prompts/gym_code.jinja2

@@ -8,3 +8,12 @@ __pycache__/
 output/__pycache__/
 prompts/__pycache__/
 validation/__pycache__/
+
+# Logs Folders
+cwm_logs/
+
+# Output Folder
+output/
+
+# Shell
+cwm_job.sh

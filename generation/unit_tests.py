@@ -33,6 +33,21 @@ def run_trajectory_test(code_str: str) -> bool:
 
         env = env_class()
         
+        # Test observation space for nested spaces (Stable Baselines3 compatibility)
+        def check_nested_spaces(space, path=""):
+            if isinstance(space, gym.spaces.Dict):
+                for key, subspace in space.spaces.items():
+                    if isinstance(subspace, (gym.spaces.Dict, gym.spaces.Tuple)):
+                        raise ValueError(f"Nested observation space detected at {path}.{key}: {type(subspace)}. Stable Baselines3 doesn't support nested spaces.")
+                    check_nested_spaces(subspace, f"{path}.{key}")
+            elif isinstance(space, gym.spaces.Tuple):
+                for i, subspace in enumerate(space.spaces):
+                    if isinstance(subspace, (gym.spaces.Dict, gym.spaces.Tuple)):
+                        raise ValueError(f"Nested observation space detected at {path}[{i}]: {type(subspace)}. Stable Baselines3 doesn't support nested spaces.")
+                    check_nested_spaces(subspace, f"{path}[{i}]")
+        
+        check_nested_spaces(env.observation_space)
+        
         # Test Reset API
         try:
             reset_result = env.reset()

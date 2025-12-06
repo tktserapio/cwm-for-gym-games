@@ -6,7 +6,11 @@ Game Description:
 Requirements:
 1. Inherit from `gymnasium.Env`.
 2. **Action Space:** Use `spaces.Discrete(N)`.
-3. **Observation Space:** Use `spaces.Box` or `spaces.Dict`.
+3. **Observation Space:** Use `spaces.Box` (preferred) or flat `spaces.Dict`. 
+   - CRITICAL: NO NESTED SPACES (no Dict inside Dict, no Tuple inside Tuple)
+   - Valid: `spaces.Dict({'board': spaces.Box(...), 'player': spaces.Discrete(2)})`
+   - INVALID: `spaces.Dict({'board': spaces.Box(...), 'tokens': spaces.Dict({...})})`
+   - Prefer flattening complex state into a single `spaces.Box`
 4. **Required Methods**:
    ```python
    def reset(self, seed=None, options=None):
