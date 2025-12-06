@@ -27,13 +27,20 @@ class SelfPlayWrapper(gym.Wrapper):
                 action = np.random.choice(valid_moves)
                 obs, _, _, _, info = self.env.step(action)
         
-        # CANONICALIZE: Flip board if playing as -1 so Agent always sees '1' as self
+        # ### FIX 1: Canonicalize observation (Flip board if playing as -1)
+        # Now Agent always sees '1' as self, even if it's actually '-1' on the board
         return obs * self.agent_player, info
     
     def step(self, action):
         # 1. Agent makes its move
         obs, reward, terminated, truncated, info = self.env.step(action)
         
+        # [CRITICAL FIX] Terminate immediately on invalid move
+        # This prevents the agent from accumulating -100 penalties that hide the win signal.
+        if reward == -10:
+            terminated = True
+            return obs * self.agent_player, reward, terminated, truncated, info
+
         # 2. If game not over, Opponent makes move (Random Policy)
         if not (terminated or truncated):
             if self.env.unwrapped.current_player != self.agent_player:
@@ -48,7 +55,6 @@ class SelfPlayWrapper(gym.Wrapper):
                     else:
                         reward = 0
 
-        # CANONICALIZE: Flip board for the next step
         return obs * self.agent_player, reward, terminated, truncated, info
 
 class PPOTrainer:
@@ -62,20 +68,19 @@ class PPOTrainer:
         model = PPO(
             "MlpPolicy",
             vec_env,
-            learning_rate=3e-4, # Good default for simple games
+            learning_rate=3e-4, 
             gamma=0.99,
             gae_lambda=0.95,
             clip_range=0.2,
             batch_size=64,
             n_steps=2048,
-            verbose=0 # Reduce noise
+            verbose=0
         )
 
         try:
             print(f"Training PPO for {total_timesteps} steps...")
             model.learn(total_timesteps=total_timesteps)
             
-            # Evaluate against Random Agent
             win_rate = self._evaluate_winrate(model)
             return win_rate
             
@@ -86,53 +91,41 @@ class PPOTrainer:
             return 0.0
 
     def _evaluate_winrate(self, model, episodes=100):
-        """
-        Evaluates the trained agent against a random opponent.
-        Now correctly handles the 'observation flip' during inference.
-        """
         env = self.env_class()
         wins = 0
-        losses = 0
-        draws = 0
         
         for ep in range(episodes):
             obs, _ = env.reset()
             done = False
             
-            # Alternate which player the agent controls
+            # Alternate agent player
             agent_player = 1 if ep % 2 == 0 else -1
             
-            # If Agent is Player -1, Opponent (Random) moves first
+            # If Agent is O, Opponent (X) moves first
             if agent_player == -1:
                  valid_moves = env.unwrapped.valid_moves()
                  action = np.random.choice(valid_moves)
                  obs, _, done, _, _ = env.step(action)
 
             while not done:
-                # 1. Agent's Turn
-                # FLIP OBS: Model expects Self=1. If we are -1, we must multiply obs by -1
+                # ### FIX 3: Flip Obs during Evaluation too!
                 canonical_obs = obs * agent_player
                 action, _ = model.predict(canonical_obs, deterministic=True)
                 
-                # Check for invalid move (fallback to random if model hallucinates)
+                # Fallback for illegal moves
                 valid_moves = env.unwrapped.valid_moves()
                 if action not in valid_moves:
-                    # Penalty behavior or random fallback
                     action = np.random.choice(valid_moves) if valid_moves else action
 
                 obs, reward, terminated, truncated, _ = env.step(action)
                 done = terminated or truncated
 
                 if done:
-                    # Reward is +1 if Current Player wins. 
-                    # If Agent just moved and won, reward is +1.
-                    if reward == 1: 
-                        wins += 1
-                    elif reward == 0: 
-                        draws += 1
+                    # If Agent moved and won, reward is +1
+                    if reward == 1: wins += 1
                     break
 
-                # 2. Opponent's Turn
+                # Opponent Turn
                 valid_moves = env.unwrapped.valid_moves()
                 if valid_moves:
                     opp_action = np.random.choice(valid_moves)
@@ -141,11 +134,7 @@ class PPOTrainer:
                     
                     if done:
                         # If Opponent moved and won, reward is +1 (for opponent)
-                        if reward == 1: 
-                            losses += 1
-                        elif reward == 0: 
-                            draws += 1
+                        # So for agent, this is a loss.
                         break
                     
-        print(f"Evaluation: {wins} Wins / {losses} Losses / {draws} Draws")
         return wins / episodes
