@@ -3,72 +3,156 @@ import numpy as np
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv
 
-class SelfPlayWrapper(gym.Wrapper):
+# ==========================================
+# 1. Wrapper for Board Games (Chess, TTT)
+# ==========================================
+class PerfectInfoWrapper(gym.Wrapper):
     """
-    Wrapper to enable self-play training.
-    CRITICAL: Canonicalizes the observation so the Agent always sees itself as '1'.
+    For symmetric or directional board games (Perfect Information).
+    - Flips values (-1 -> 1) so Agent always sees itself as Player 1.
+    - Rotates board 180 degrees if board_shape is provided (for directional games).
     """
-    
-    def __init__(self, env):
+    def __init__(self, env, board_shape=None):
         super().__init__(env)
         self.agent_player = None
-        
+        self.board_shape = board_shape
+
     def reset(self, **kwargs):
         obs, info = self.env.reset(**kwargs)
-        # Randomly assign agent to play as player 1 (X) or -1 (O)
         self.agent_player = np.random.choice([1, -1])
         info['agent_player'] = self.agent_player
         
-        # If agent is player -1 (O), the Opponent (X) must move first
+        # If Agent is Player 2, Opponent (P1) moves first
         if self.agent_player == -1:
             valid_moves = self.env.unwrapped.valid_moves()
             if valid_moves:
-                # Random opponent move
                 action = np.random.choice(valid_moves)
                 obs, _, _, _, info = self.env.step(action)
         
-        # ### FIX 1: Canonicalize observation (Flip board if playing as -1)
-        # Now Agent always sees '1' as self, even if it's actually '-1' on the board
-        return obs * self.agent_player, info
-    
+        return self.canonicalize(obs, self.agent_player), info
+
     def step(self, action):
-        # 1. Agent makes its move
-        obs, reward, terminated, truncated, info = self.env.step(action)
+        # Transform action (if board is rotated)
+        real_action = self.transform_action(action, self.agent_player)
         
-        # [CRITICAL FIX] Terminate immediately on invalid move
-        # This prevents the agent from accumulating -100 penalties that hide the win signal.
+        # Agent Move
+        obs, reward, terminated, truncated, info = self.env.step(real_action)
+
+        # Terminate on invalid move penalty
         if reward == -10:
             terminated = True
-            return obs * self.agent_player, reward, terminated, truncated, info
+            return self.canonicalize(obs, self.agent_player), reward, terminated, truncated, info
 
-        # 2. If game not over, Opponent makes move (Random Policy)
+        # Opponent Move
         if not (terminated or truncated):
             if self.env.unwrapped.current_player != self.agent_player:
                 valid_moves = self.env.unwrapped.valid_moves()
                 if valid_moves:
-                    opponent_action = np.random.choice(valid_moves)
-                    obs, opp_reward, terminated, truncated, info = self.env.step(opponent_action)
+                    opp_action = np.random.choice(valid_moves)
+                    obs, opp_reward, terminated, truncated, info = self.env.step(opp_action)
                     
-                    # Flip reward: If opponent won (opp_reward=1), Agent gets -1
                     if terminated or truncated:
                         reward = -opp_reward
                     else:
                         reward = 0
 
-        return obs * self.agent_player, reward, terminated, truncated, info
+        return self.canonicalize(obs, self.agent_player), reward, terminated, truncated, info
 
+    def canonicalize(self, obs, player):
+        if player == 1: return obs
+        obs = obs * -1 # Value flip
+        if self.board_shape: # Spatial flip
+            grid = obs.reshape(self.board_shape)
+            grid = np.rot90(grid, 2)
+            obs = grid.flatten()
+        return obs
+
+    def transform_action(self, action, player):
+        if player == 1 or self.board_shape is None: return action
+        # Invert index for 180 rotation
+        total_squares = self.board_shape[0] * self.board_shape[1]
+        return (total_squares - 1) - action
+
+# ==========================================
+# 2. Wrapper for Card Games (Poker)
+# ==========================================
+class ImperfectInfoWrapper(gym.Wrapper):
+    """
+    For Card Games (Imperfect Information).
+    - Does NOT flip observations (relies on Env to give relative view).
+    - Handles Opponent turns and Reward flipping.
+    """
+    def __init__(self, env):
+        super().__init__(env)
+        self.agent_player = None
+
+    def reset(self, **kwargs):
+        self.agent_player = np.random.choice([1, -1])
+        obs, info = self.env.reset(**kwargs)
+        info['agent_player'] = self.agent_player
+        
+        # If Agent is Player 2, Opponent (P1) moves first
+        if self.agent_player == -1:
+             if self.env.unwrapped.current_player != self.agent_player:
+                valid_moves = self.env.unwrapped.valid_moves()
+                if valid_moves:
+                    action = np.random.choice(valid_moves)
+                    obs, _, _, _, info = self.env.step(action)
+        return obs, info
+
+    def step(self, action):
+        # Agent Move
+        obs, reward, terminated, truncated, info = self.env.step(action)
+        
+        if reward == -10:
+            terminated = True
+            return obs, reward, terminated, truncated, info
+
+        # Opponent Move
+        if not (terminated or truncated):
+            if self.env.unwrapped.current_player != self.agent_player:
+                valid_moves = self.env.unwrapped.valid_moves()
+                if valid_moves:
+                    opp_action = np.random.choice(valid_moves)
+                    obs, opp_reward, terminated, truncated, info = self.env.step(opp_action)
+                    
+                    if terminated or truncated:
+                        reward = -opp_reward
+                    else:
+                        reward = 0
+        return obs, reward, terminated, truncated, info
+
+# ==========================================
+# 3. Main Trainer Class
+# ==========================================
 class PPOTrainer:
-    def __init__(self, env_class):
+    def __init__(self, env_class, game_type="perfect", board_shape=None):
+        """
+        env_class: The Gym class generated by LLM.
+        game_type: "perfect" (Board) or "imperfect" (Cards).
+        board_shape: Tuple (e.g. (8,8)) for directional board games, None otherwise.
+        """
         self.env_class = env_class
+        self.game_type = game_type
+        self.board_shape = board_shape
+
+    def _make_wrapped_env(self):
+        """Factory function to create the correct environment."""
+        env = self.env_class()
+        if self.game_type == "perfect":
+            return PerfectInfoWrapper(env, self.board_shape)
+        else:
+            return ImperfectInfoWrapper(env)
 
     def train_and_evaluate(self, total_timesteps=100_000):
-        # Vectorize environment with the CORRECTED wrapper
-        vec_env = DummyVecEnv([lambda: SelfPlayWrapper(self.env_class())])
+        # Vectorize using the factory method
+        vec_env = DummyVecEnv([self._make_wrapped_env])
 
         model = PPO(
             "MlpPolicy",
             vec_env,
-            learning_rate=3e-4, 
+            ent_coef=0.01, # Helps exploration
+            learning_rate=3e-4,
             gamma=0.99,
             gae_lambda=0.95,
             clip_range=0.2,
@@ -78,12 +162,9 @@ class PPOTrainer:
         )
 
         try:
-            print(f"Training PPO for {total_timesteps} steps...")
+            print(f"Training ({self.game_type}) for {total_timesteps} steps...")
             model.learn(total_timesteps=total_timesteps)
-            
-            win_rate = self._evaluate_winrate(model)
-            return win_rate
-            
+            return self._evaluate_winrate(model)
         except Exception as e:
             print(f"Training failed: {e}")
             import traceback
@@ -91,50 +172,36 @@ class PPOTrainer:
             return 0.0
 
     def _evaluate_winrate(self, model, episodes=100):
-        env = self.env_class()
+        """
+        Evaluates using the SAME wrapper logic used in training.
+        """
+        # We must use the wrapper during eval to ensure Agent sees the right perspective
+        eval_env = self._make_wrapped_env()
+        
         wins = 0
+        losses = 0
+        draws = 0
         
         for ep in range(episodes):
-            obs, _ = env.reset()
+            obs, info = eval_env.reset()
             done = False
             
-            # Alternate agent player
-            agent_player = 1 if ep % 2 == 0 else -1
-            
-            # If Agent is O, Opponent (X) moves first
-            if agent_player == -1:
-                 valid_moves = env.unwrapped.valid_moves()
-                 action = np.random.choice(valid_moves)
-                 obs, _, done, _, _ = env.step(action)
-
             while not done:
-                # ### FIX 3: Flip Obs during Evaluation too!
-                canonical_obs = obs * agent_player
-                action, _ = model.predict(canonical_obs, deterministic=True)
+                action, _ = model.predict(obs, deterministic=True)
                 
-                # Fallback for illegal moves
-                valid_moves = env.unwrapped.valid_moves()
+                # Check for validity (optional safety check)
+                valid_moves = eval_env.env.unwrapped.valid_moves() # Access inner env
                 if action not in valid_moves:
                     action = np.random.choice(valid_moves) if valid_moves else action
 
-                obs, reward, terminated, truncated, _ = env.step(action)
+                obs, reward, terminated, truncated, _ = eval_env.step(action)
                 done = terminated or truncated
 
                 if done:
-                    # If Agent moved and won, reward is +1
-                    if reward == 1: wins += 1
-                    break
-
-                # Opponent Turn
-                valid_moves = env.unwrapped.valid_moves()
-                if valid_moves:
-                    opp_action = np.random.choice(valid_moves)
-                    obs, reward, terminated, truncated, _ = env.step(opp_action)
-                    done = terminated or truncated
+                    # In our wrappers, Positive Reward = Agent Win
+                    if reward > 0: wins += 1
+                    elif reward < 0: losses += 1
+                    else: draws += 1
                     
-                    if done:
-                        # If Opponent moved and won, reward is +1 (for opponent)
-                        # So for agent, this is a loss.
-                        break
-                    
+        print(f"Evaluation: {wins}W / {losses}L / {draws}D")
         return wins / episodes
